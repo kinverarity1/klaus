@@ -1,5 +1,6 @@
 from io import BytesIO
 import os
+import shutil
 import sys
 
 from flask import request, render_template, current_app, url_for
@@ -430,7 +431,7 @@ class RawView(BaseBlobView):
         return Response(self.context['blob_or_tree'].chunked, mimetype='')
 
 
-class DownloadView(BaseRepoView):
+class DownloadTarballView(BaseRepoView):
     """Download a repo as a tar.gz file."""
     def get_response(self):
         basename = "%s@%s" % (self.context['repo'].name,
@@ -455,6 +456,30 @@ class DownloadView(BaseRepoView):
         )
 
 
+class DownloadZipView(BaseRepoView):
+    """Download a repo as a tar.gz file."""
+    def get_response(self):
+        basename = "%s@%s" % (self.context['repo'].name,
+                              sanitize_branch_name(self.context['rev']))
+        tarname = basename + ".tar.gz"
+        zipname = basename + ".zip"
+        tar_stream = dulwich.archive.tar_stream(
+            self.context['repo'],
+            self.context['blob_or_tree'],
+            self.context['commit'].commit_time,
+            format="gz",
+            prefix=encode_for_git(basename),
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(os.path.join(tmpdir, tarname), "rb+") as tar:
+                tar.write(tar_stream.read())
+            # shutil - unpack archive
+            # shutil - create zip
+            # read zip into memory
+        # drop out of context to remove the files
+        # respond with contents of zip
+
+
 history = HistoryView.as_view('history', 'history')
 index = IndexView.as_view('index', 'index')
 commit = CommitView.as_view('commit', 'commit')
@@ -462,5 +487,6 @@ patch = PatchView.as_view('patch', 'patch')
 blame = BlameView.as_view('blame', 'blame')
 blob = FileView.as_view('blob', 'blob')
 raw = RawView.as_view('raw', 'raw')
-download = DownloadView.as_view('download', 'download')
+download_tarball = DownloadTarballView.as_view('download-tarball', 'download-tarball')
+download_zip = DownloadZipView.as_view('download-zip', 'download-zip')
 submodule = SubmoduleView.as_view('submodule', 'submodule')
